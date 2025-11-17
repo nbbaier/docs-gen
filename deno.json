@@ -19,7 +19,8 @@
     "unstable-worker-options": true
   },
   "imports": {
-    "@biomejs/biome": "npm:@biomejs/biome@^2.3.5"
+    "@biomejs/biome": "npm:@biomejs/biome@^2.3.5",
+    "@valtown/sdk": "npm:@valtown/sdk@^0.36.0"
   },
   "lint": {
     "files": {

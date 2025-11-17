@@ -1,7 +1,9 @@
 /**
  * Val Town API client for fetching val metadata and source code
+ * Uses the official @valtown/sdk for API interactions
  */
 
+import ValTown from "@valtown/sdk";
 import type { ValMetadata } from "../../shared/docTypes.ts";
 
 /**
@@ -38,68 +40,55 @@ export function parseValIdentifier(val: string): {
 }
 
 /**
- * Fetch val metadata from Val Town API
+ * Fetch val metadata using the official Val Town SDK
  */
 async function fetchValMetadata(
+  client: ValTown,
   username: string,
   valname: string,
 ): Promise<ValMetadata> {
-  const url = `https://api.val.town/v1/alias/${username}/${valname}`;
+  try {
+    // Use the SDK's alias retrieve method to fetch val metadata
+    const val = await client.alias.username.valName.retrieve(username, valname);
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
+    // Map SDK response to our ValMetadata format
+    return {
+      id: val.id,
+      name: val.name,
+      author: {
+        username: val.author?.username || username,
+        id: val.author?.id || "",
+      },
+      version: String(val.version || "1"),
+      privacy: val.privacy || "public",
+      createdAt: val.createdAt,
+      updatedAt: val.updatedAt,
+      readme: val.readme,
+    };
+  } catch (error) {
+    if (error instanceof ValTown.NotFoundError) {
       throw new Error(`Val not found: ${username}/${valname}`);
     }
-    throw new Error(
-      `Failed to fetch val metadata: ${response.status} ${response.statusText}`,
-    );
+    throw new Error(`Failed to fetch val metadata: ${error.message}`);
   }
-
-  const data = await response.json();
-
-  // Map API response to our ValMetadata format
-  return {
-    id: data.id,
-    name: data.name,
-    author: {
-      username: data.author?.username || username,
-      id: data.author?.id || data.authorId,
-    },
-    version: String(data.version || "1"),
-    privacy: data.privacy || "public",
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-    readme: data.readme,
-  };
 }
 
 /**
- * Fetch val source code
- * Val Town stores code at esm.town/v/{username}/{valname}@{version}
+ * Fetch val source code using the official Val Town SDK
  */
 async function fetchValSource(
-  username: string,
-  valname: string,
-  version: string,
+  client: ValTown,
+  valId: string,
 ): Promise<string> {
-  // Try to fetch from esm.town
-  const url = `https://esm.town/v/${username}/${valname}@${version}`;
+  try {
+    // Use the SDK's files.getContent method to fetch val source code
+    const response = await client.vals.files.getContent(valId);
 
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch val source: ${response.status} ${response.statusText}`,
-    );
+    // The response is a blob/stream, convert it to text
+    return await response.text();
+  } catch (error) {
+    throw new Error(`Failed to fetch val source: ${error.message}`);
   }
-
-  return await response.text();
 }
 
 /**
@@ -110,18 +99,22 @@ export interface ValFetcher {
 }
 
 /**
- * Create a Val Town API fetcher
+ * Create a Val Town API fetcher using the official SDK
  */
 export function createValFetcher(): ValFetcher {
+  // Initialize the Val Town SDK client
+  // The SDK automatically uses VAL_TOWN_API_KEY environment variable if available
+  const client = new ValTown();
+
   return {
     async fetchLatest(val: string): Promise<ValBundle> {
       const { username, valname } = parseValIdentifier(val);
 
-      // Fetch metadata first
-      const metadata = await fetchValMetadata(username, valname);
+      // Fetch metadata first using the SDK
+      const metadata = await fetchValMetadata(client, username, valname);
 
-      // Fetch source code
-      const source = await fetchValSource(username, valname, metadata.version);
+      // Fetch source code using the SDK
+      const source = await fetchValSource(client, metadata.id);
 
       // For now, we treat the val as a single file
       // In the future, we could support multi-file vals/projects
