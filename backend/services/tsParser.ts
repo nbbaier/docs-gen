@@ -64,7 +64,7 @@ function parseJSDocComment(
 			return {
 				name,
 				type: undefined,
-				description: desc.trim(),
+				description: desc.trim().replace(/^-\s*/, ""), // Remove leading dash
 			};
 		});
 	}
