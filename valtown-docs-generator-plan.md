@@ -1,525 +1,232 @@
-# Val Town Documentation Generator - Technical Plan
+# Implementation Plan
 
-## Overview
+## Goal
 
-Build a tool that allows users to point at any Val Town val and get automatically generated, nicely formatted API reference documentation from TypeScript type definitions and JSDoc/TSDoc comments.
+-  After completion, visiting the published `docGenerator` HTTP val with a `?val=username/valname` query returns generated API docs < 3s for a representative public val.
+-  Success criteria:
+   -  `GET /api/docs?val=acme/sample` responds 200 with parsed exports (functions, types, constants) in JSON validated against `DocManifest` schema.
+   -  UI route `/` renders documentation cards for the same sample val with syntax highlighting and navigation.
+   -  Cache hits logged for repeat requests within 1 hour, cache misses stay under 2 API calls per request and serve cached manifests/HTML within ~20 ms.
+-  Scope boundaries:
+   -  No authentication for private vals, no editing/workspace features.
+   -  Multi-val/project aggregation and version diffing remain out of scope for v1.
+   -  UI polish limited to Tailwind-based theming without custom theming engine.
 
-## Goals
+## Analysis
 
--  **Primary**: Enable one-click documentation generation for any public val
--  **Secondary**: Make the docs look professional and modern
--  **Tertiary**: Support Val Town-specific features (val metadata, runtime info, etc.)
+-  Key components and responsibilities (to be created under `/backend`, `/frontend`, `/shared` as per AGENTS guidelines):
+   -  [backend/docGenerator.http.ts](/backend/docGenerator.http.ts#L1-L200) — Planned Hono HTTP entrypoint orchestrating fetch → parse → cache → render.
+   -  [backend/services/valFetcher.ts](/backend/services/valFetcher.ts#L1-L200) — Planned Val Town API client resolving val metadata and source bundle.
+   -  [backend/services/tsParser.ts](/backend/services/tsParser.ts#L1-L300) — Planned TypeScript compiler API walker emitting `ParsedDocumentation`.
+   -  [backend/services/docCache.ts](/backend/services/docCache.ts#L1-L160) — Planned blob-backed cache with memory front.
+   -  [shared/docTypes.ts](/shared/docTypes.ts#L1-L200) — Planned shared TypeScript interfaces for parser output and UI consumption.
+   -  [frontend/index.html](/frontend/index.html#L1-L200) & [frontend/App.tsx](/frontend/App.tsx#L1-L200) — Planned React shell rendering docs, search, and navigation.
+-  Data/types affected:
+   -  `DocManifest`, `FunctionDoc`, `TypeDoc`, `ClassDoc`, `ConstantDoc`, `ImportInfo`; caching metadata `{ cacheKey: string; createdAt: number; version: string; }`.
+   -  Request DTO `{ val: string; refresh?: boolean }`, error envelope `{ code: string; message: string; details?: unknown }`.
+-  Current flow:
+   1. Request enters Hono → query param validation.
+   2. Cache lookup by `valIdentifier@version` (memory → blob fallback).
+   3. On miss: fetch val metadata + files → parse AST → build manifest → persist cache.
+   4. API route returns JSON; UI route hydrates React with initial manifest + fetch fallback.
 
-## Non-Goals (v1)
+## Approach
 
--  Private val documentation (authentication complexities)
--  Multi-val project documentation (start with single-val scope)
--  Interactive API playground
--  Version history/changelog generation
+-  Establish shared documentation schemas and validation helpers first so backend and frontend contract is locked before logic work.
+-  Implement val fetching and caching seams prior to TypeScript parsing to minimize external API pressure and enable testability via fixtures.
+-  Build the TypeScript parser as a pure module with exhaustive unit tests, then integrate into the fetcher pipeline behind cache lookups.
+-  Compose the Hono HTTP val with separate API (`/api/docs`) and UI (`/`) routes, injecting fetch/parse/cache services for easy stubbing.
+-  Deliver the React/Twind frontend last, hydrating with server-injected manifest while supporting client-side refresh via the API.
+-  Assumptions: `npm:typescript` bundling works in Val Town serverless context; Val Town REST endpoints for public vals require no auth; Tailwind via Twind CDN is acceptable for styling.
 
-## Architecture
+## Step-by-Step Implementation
 
-### High-Level Flow
+> Sequence logically: refactor → scaffold → integrate (flagged) → validate → cleanup.
 
-```
-User Input (val identifier)
-  → Fetch val source code via Val Town API
-  → Parse TypeScript AST
-  → Extract exports + JSDoc comments
-  → Transform to documentation data structure
-  → Render as HTML/React UI
-  → Cache result
-```
+### Step 1 — Define shared documentation contract
 
-### Component Breakdown
+**Intent:** Lock parser ↔ renderer contract and validation helpers before logic diverges.
+**Files:** [shared/docTypes.ts](/shared/docTypes.ts#L1-L200), [shared/docTypes.test.ts](/shared/docTypes.test.ts#L1-L160)
+**Change sketch:**
 
-#### 1. Main HTTP Val (`docGenerator`)
-
--  **Type**: HTTP val
--  **Purpose**: Entry point that orchestrates the entire flow
--  **Responsibilities**:
-   -  Accept val identifier via query param (`?val=username/valname`)
-   -  Coordinate fetching, parsing, and rendering
-   -  Handle errors gracefully
-   -  Implement caching strategy
-
-#### 2. Val Fetcher Module (`valFetcher`)
-
--  **Type**: Script val (library)
--  **Purpose**: Fetch val source code and metadata
--  **Responsibilities**:
-   -  Use Val Town REST API to fetch val details
-   -  Handle multi-file vals (return all .ts/.tsx files)
-   -  Return structured data: `{ files: [{ path, content, fileType }], metadata }`
-   -  Error handling for non-existent vals, private vals, etc.
-
-#### 3. TypeScript Parser Module (`tsParser`)
-
--  **Type**: Script val (library)
--  **Purpose**: Parse TypeScript and extract documentation-relevant information
--  **Dependencies**: `npm:typescript`
--  **Responsibilities**:
-   -  Create TypeScript AST from source code
-   -  Walk AST to find exported declarations
-   -  Extract JSDoc comments with type information
-   -  Transform into clean data structure
--  **Output Structure**:
-
-```typescript
-interface ParsedDocumentation {
-   exports: {
-      functions: FunctionDoc[];
-      classes: ClassDoc[];
-      interfaces: InterfaceDoc[];
-      types: TypeAliasDoc[];
-      constants: ConstantDoc[];
-   };
-   imports: ImportInfo[];
-}
-
-interface FunctionDoc {
-   name: string;
-   description: string;
-   params: ParamDoc[];
-   returns: ReturnDoc;
-   examples: string[];
-   tags: Record<string, string>; // @deprecated, @see, etc.
-   signature: string;
-   sourceLocation: { line: number; file: string };
-}
+```diff
++ export interface DocManifest {
++   val: string;
++   version: string;
++   generatedAt: string;
++   exports: {
++     functions: FunctionDoc[];
++     classes: ClassDoc[];
++     interfaces: InterfaceDoc[];
++     types: TypeAliasDoc[];
++     constants: ConstantDoc[];
++   };
++   imports: ImportInfo[];
++   metadata: ValMetadata;
++ }
++
++ export function assertDocManifest(data: unknown): asserts data is DocManifest {
++   // runtime validation leveraging type predicates or zod-like helper (decide on zod dependency vs hand-rolled guards)
++ }
 ```
 
-#### 4. Documentation Renderer (`docRenderer`)
+**Preconditions:** None.
+**Postconditions:** Typed contract with runtime guard available for backend and frontend.
+**Checks:** Unit tests covering validation happy path and failure scenarios.
 
--  **Type**: Script val (library) or React component
--  **Purpose**: Transform parsed data into beautiful HTML
--  **Approach**: React component with Tailwind CSS
--  **Features**:
-   -  Syntax highlighting for code examples
-   -  Collapsible sections
-   -  Search/filter functionality
-   -  Responsive design
-   -  Dark mode support
-   -  Copy-to-clipboard for code snippets
+### Step 2 — Scaffold Val Town fetcher and cache seams
 
-#### 5. Cache Layer (`docCache`)
+**Intent:** Provide deterministic data sources and caching hooks prior to parser integration.
+**Files:** [backend/services/valFetcher.ts](/backend/services/valFetcher.ts#L1-L200), [backend/services/docCache.ts](/backend/services/docCache.ts#L1-L200), [backend/services/**tests**/valFetcher.test.ts](/backend/services/__tests__/valFetcher.test.ts#L1-L200)
+**Change sketch:**
 
--  **Type**: Script val using Val Town blob storage or SQLite
--  **Purpose**: Cache generated documentation to improve performance
--  **Strategy**:
-   -  Key: `${valIdentifier}-${valVersion}`
-   -  TTL: 1 hour (or invalidate on val update)
-   -  Store: Rendered HTML or parsed JSON
-
-## Technical Implementation Details
-
-### TypeScript AST Parsing
-
-Key TypeScript compiler API functions to use:
-
-```typescript
-import ts from "npm:typescript";
-
-// Parse source code
-const sourceFile = ts.createSourceFile(
-   filename,
-   sourceCode,
-   ts.ScriptTarget.Latest,
-   true
-);
-
-// Walk the AST
-function visit(node: ts.Node) {
-   if (ts.isExportDeclaration(node)) {
-      // Handle export declarations
-   }
-   if (ts.isFunctionDeclaration(node) && hasExportModifier(node)) {
-      // Extract function documentation
-   }
-   ts.forEachChild(node, visit);
-}
-
-// Extract JSDoc
-function getJsDocTags(node: ts.Node) {
-   const jsDocTags = ts.getJSDocTags(node);
-   // Process tags
-}
+```diff
++ export interface ValFetcher {
++   fetchLatest(val: string): Promise<ValBundle>;
++ }
++
++ export const docCache = createDocCache({
++   ttlMs: 60 * 60 * 1000,
++   blobPrefix: "doc-manifest",
++ });
 ```
 
-### JSDoc Comment Extraction
+**Preconditions:** Step 1 contract finalized.
+**Postconditions:** Fetcher returns mocked data in tests; cache exposes get/set/isFresh with blob-backed implementation (no parser usage yet).
+**Checks:** Unit tests hitting Val Town API via mocked fetch; cache tests verifying TTL & key derivation.
 
-Support standard JSDoc tags:
+### Step 3 — Implement TypeScript parser module
 
--  `@param` - Parameter descriptions
--  `@returns` / `@return` - Return value description
--  `@example` - Usage examples
--  `@deprecated` - Deprecation notices
--  `@see` - Related references
--  `@throws` / `@exception` - Error conditions
--  `@remarks` - Additional notes
+**Intent:** Build pure parsing logic producing the shared manifest structures without I/O coupling.
+**Files:** [backend/services/tsParser.ts](/backend/services/tsParser.ts#L1-L300), [backend/services/**tests**/tsParser.test.ts](/backend/services/__tests__/tsParser.test.ts#L1-L300), [test-fixtures/vals/simple.ts](/test-fixtures/vals/simple.ts#L1-L200)
+**Change sketch:**
 
-### Val Town API Integration
-
-Endpoints to use:
-
--  `GET /v1/vals/:id` - Get val metadata
--  `GET /v1/vals/:id/versions/:version` - Get specific version
--  Use the MCP tools available: `val-town:read_file`, `val-town:get_val_detail`
-
-### Rendering Strategy
-
-**Option A: Server-Side Rendering (Simpler)**
-
--  Generate complete HTML on each request
--  Pro: Works without JavaScript
--  Con: Slower, less interactive
-
-**Option B: React SPA (Recommended)**
-
--  Serve a React app that fetches JSON documentation data
--  Use Tailwind for styling
--  Pro: Better UX, more interactive features
--  Con: Requires JavaScript enabled
-
-**Recommended: Option B** for better user experience
-
-### React Component Structure
-
-```typescript
-// Main component
-export default function DocViewer({ valIdentifier }: Props) {
-   const [docs, setDocs] = useState(null);
-   const [loading, setLoading] = useState(true);
-
-   useEffect(() => {
-      fetch(`/api/docs?val=${valIdentifier}`)
-         .then((res) => res.json())
-         .then(setDocs);
-   }, [valIdentifier]);
-
-   return (
-      <div className="docs-container">
-         <Header val={docs?.metadata} />
-         <SearchBar />
-         <Sidebar exports={docs?.exports} />
-         <MainContent exports={docs?.exports} />
-      </div>
-   );
-}
+```diff
++ export function parseValBundle(bundle: ValBundle): DocManifest {
++   const program = ts.createProgram(
++     bundle.files.map((file) => file.path),
++     compilerOptions,
++     createInMemoryCompilerHost(bundle)
++   );
++   // walk AST, fill manifest.exports
++   return manifest;
++ }
 ```
 
-Key sub-components:
+**Preconditions:** Step 1 types available; Step 2 supplies ValBundle shape.
+**Postconditions:** Parser returns manifest for fixture bundles with deterministic ordering; no cache integration yet.
+**Checks:** Unit tests for functions, classes, interfaces, type aliases, constants, malformed inputs.
 
--  `<Header>` - Val name, description, links
--  `<SearchBar>` - Filter exports by name
--  `<Sidebar>` - Navigation tree of exports
--  `<FunctionDoc>` - Render function documentation
--  `<TypeDoc>` - Render type/interface documentation
--  `<CodeBlock>` - Syntax-highlighted code
+### Step 4 — Compose doc generation pipeline with caching
 
-## Data Flow
+**Intent:** Integrate fetcher, parser, and cache into orchestrated service exposing `generateDocs`, caching manifests and prerendered HTML for <3s responses.
+**Files:** [backend/services/docService.ts](/backend/services/docService.ts#L1-L200), [backend/services/**tests**/docService.test.ts](/backend/services/__tests__/docService.test.ts#L1-L200)
+**Change sketch:**
 
-### Request Flow
-
-1. User visits: `https://username.val.town/v/docGenerator?val=someuser/someval`
-2. Check cache for `someuser/someval-v{version}`
-3. If cached: Return cached result
-4. If not cached:
-   -  Fetch val source via Val Town API
-   -  Parse TypeScript AST
-   -  Extract documentation data
-   -  Transform to JSON structure
-   -  Store in cache
-   -  Render UI (serve React app + JSON data)
-5. Return response
-
-### Error Handling
-
--  **Val not found**: Show friendly 404 with search suggestions
--  **Private val**: Explain permissions needed
--  **Parse error**: Show what failed, offer to view raw source
--  **API rate limits**: Implement exponential backoff, show status
-
-## UI/UX Design
-
-### Layout
-
-```
-+------------------------------------------+
-|  Header: Val Name, Description, Links   |
-+------------------------------------------+
-|           |                              |
-|  Sidebar  |    Main Content Area         |
-|  (Nav)    |                              |
-|           |  Function: doSomething()     |
-|  - Funcs  |  Description: ...            |
-|  - Types  |  Parameters:                 |
-|  - Consts |    - param1: string          |
-|           |  Returns: Promise<void>      |
-|           |  Example: [code block]       |
-|           |                              |
-+------------------------------------------+
+```diff
++ export interface CachedDocPayload {
++   manifest: DocManifest;
++   ssrHtml?: string;
++   cachedAt: number;
++ }
++
++ export async function generateDocs(val: string, opts: { refresh?: boolean }) {
++   const cacheKey = deriveCacheKey(val);
++   if (!opts.refresh) {
++     const cached = await docCache.get<CachedDocPayload>(cacheKey);
++     if (cached && !docCache.isExpired(cacheKey)) return cached;
++   }
++   const bundle = await valFetcher.fetchLatest(val);
++   const manifest = parseValBundle(bundle);
++   const payload: CachedDocPayload = { manifest, cachedAt: Date.now() };
++   await docCache.set(cacheKey, payload, { version: bundle.version });
++   return payload;
++ }
 ```
 
-### Visual Design Principles
+**Preconditions:** Steps 1–3 merged.
+**Postconditions:** Single orchestration entry point with cache hit logging hook, rate-limited fetch usage; cached payload reusable for API and UI routes.
+**Checks:** Service tests mocking cache/fetcher to assert cache strategy, ttl handling, and refresh behavior.
 
--  Clean, minimal aesthetic (think Stripe/Vercel docs)
--  Ample whitespace
--  Syntax highlighting for code
--  Clear typography hierarchy
--  Responsive (mobile-friendly)
--  Accessibility: semantic HTML, ARIA labels, keyboard nav
+### Step 5 — Build Hono HTTP val routes
 
-### Color Scheme
+**Intent:** Expose API and UI endpoints leveraging docService; ensure error handling & logging.
+**Files:** [backend/docGenerator.http.ts](/backend/docGenerator.http.ts#L1-L200), [backend/routes/apiDocs.ts](/backend/routes/apiDocs.ts#L1-L200), [backend/routes/ui.ts](/backend/routes/ui.ts#L1-L200), [backend/routes/**tests**/apiDocs.test.ts](/backend/routes/__tests__/apiDocs.test.ts#L1-L200)
+**Change sketch:**
 
--  Light mode: White background, dark text, accent color
--  Dark mode: Dark background, light text, softer accent
--  Syntax highlighting: Use Prism.js or Shiki themes
+```diff
++ app.get("/api/docs", async (c) => {
++   const val = c.req.query("val");
++   if (!val) return c.json({ code: "BAD_REQUEST" }, 400);
++   const { manifest } = await generateDocs(val, { refresh: c.req.query("refresh") === "true" });
++   return c.json(manifest);
++ });
++
++ app.get("/", async (c) => {
++   const initialVal = c.req.query("val");
++   const cached = initialVal ? await generateDocs(initialVal, { refresh: false }) : null;
++   if (!cached?.manifest) {
++     const emptyHtml = await renderIndexPage({ manifest: null, val: initialVal });
++     return c.html(emptyHtml);
++   }
++   if (!cached.ssrHtml) {
++     cached.ssrHtml = await renderIndexPage({ manifest: cached.manifest, val: initialVal });
++     await docCache.set(deriveCacheKey(initialVal), cached, { version: cached.manifest.version });
++   }
++   return c.html(cached.ssrHtml);
++ });
+```
 
-## Performance Optimization
+**Preconditions:** Step 4 ready.
+**Postconditions:** HTTP val deployed with API contract, SSR injecting initial manifest, error states handled.
+**Checks:** Integration tests via superdeno hitting API and root route; lint/typecheck.
 
-### Caching Strategy
+### Step 6 — Implement React/Twind frontend shell
 
--  **Level 1**: In-memory cache (fastest, volatile)
--  **Level 2**: Val Town blob storage (persistent, slower)
--  **Level 3**: CDN layer (for popular vals)
+**Intent:** Deliver interactive documentation UI consuming manifest and supporting client fetch refresh.
+**Files:** [frontend/index.html](/frontend/index.html#L1-L200), [frontend/App.tsx](/frontend/App.tsx#L1-L200), [frontend/components/FunctionDoc.tsx](/frontend/components/FunctionDoc.tsx#L1-L200), [frontend/components/Sidebar.tsx](/frontend/components/Sidebar.tsx#L1-L200), [frontend/**tests**/App.test.tsx](/frontend/__tests__/App.test.tsx#L1-L200)
+**Change sketch:**
 
-### Cache Invalidation
+```diff
++ /** @jsxImportSource https://esm.sh/react@18.2.0 */
++ import { useEffect, useState } from "https://esm.sh/react@18.2.0";
++ export function App(props: { initialManifest?: DocManifest; initialVal?: string }) {
++   const [manifest, setManifest] = useState(props.initialManifest ?? null);
++   // render header, sidebar, main, search, dark mode toggle
++ }
+```
 
--  Invalidate when val version changes
--  Option for manual cache clear via query param (`?refresh=true`)
--  Set reasonable TTL (1 hour default)
+**Preconditions:** Step 5 HTML render helper able to inject `initialManifest`.
+**Postconditions:** Responsive UI with search/filter, syntax highlighting via Prism/Twind, copy-to-clipboard.
+**Checks:** Frontend unit tests with pre-rendered manifest, visual smoke test in Val Town.
 
-### Optimization Techniques
+### Step 7 — Telemetry, rate limiting, and documentation
 
--  Lazy-load heavy dependencies (syntax highlighter)
--  Code splitting for React components
--  Compress responses (gzip)
--  Minify HTML/CSS/JS
--  Use HTTP/2 server push for critical resources
+**Intent:** Add request logging, cache hit metrics, rate limiting guard, and README instructions.
+**Files:** [backend/services/logger.ts](/backend/services/logger.ts#L1-L120), [backend/docGenerator.http.ts](/backend/docGenerator.http.ts#L1-L200), [README.md](/README.md#L1-L200)
+**Change sketch:**
 
-## Testing Strategy
+```diff
++ app.use("/api/docs", rateLimit({ windowMs: 60_000, max: 30 }));
++ logger.info({ event: "doc_cache_hit", val, cacheKey });
++ logger.info({ event: "doc_cache_miss", val, durationMs });
++
++## Usage
++- Deploy `docGenerator` via Val Town HTTP val.
+```
 
-### Unit Tests
-
--  Test AST parser with various TypeScript patterns
--  Test JSDoc extraction with edge cases
--  Test data transformation logic
-
-### Integration Tests
-
--  Test against real vals with known documentation
--  Test error conditions (404s, malformed TypeScript)
--  Test caching behavior
-
-### Manual Testing Checklist
-
--  [ ] Simple function with JSDoc
--  [ ] Class with methods
--  [ ] Interface definitions
--  [ ] Type aliases
--  [ ] Exported constants
--  [ ] Multiple exports in one file
--  [ ] Multi-file val
--  [ ] Val with npm dependencies
--  [ ] Val with no JSDoc comments
--  [ ] Val with malformed TypeScript
-
-## Implementation Phases
-
-### Phase 1: Core Parsing (Week 1)
-
--  [ ] Set up val structure
--  [ ] Implement Val Town API fetcher
--  [ ] Build basic TypeScript AST parser
--  [ ] Extract function declarations with JSDoc
--  [ ] Output JSON structure
--  [ ] Test with simple vals
-
-### Phase 2: Enhanced Parsing (Week 1-2)
-
--  [ ] Add support for classes
--  [ ] Add support for interfaces
--  [ ] Add support for type aliases
--  [ ] Add support for constants
--  [ ] Handle complex JSDoc tags
--  [ ] Extract code examples from JSDoc
-
-### Phase 3: Basic UI (Week 2)
-
--  [ ] Create React component structure
--  [ ] Implement basic layout (header, sidebar, content)
--  [ ] Render function documentation
--  [ ] Add syntax highlighting
--  [ ] Make responsive
-
-### Phase 4: Polish (Week 3)
-
--  [ ] Add search/filter functionality
--  [ ] Implement dark mode
--  [ ] Add copy-to-clipboard
--  [ ] Improve typography and spacing
--  [ ] Add loading states and error handling
--  [ ] Implement caching
-
-### Phase 5: Val Town Integration (Week 3-4)
-
--  [ ] Add Val Town-specific metadata display
--  [ ] Link to source code on val.town
--  [ ] Show val type (http, cron, etc.)
--  [ ] Display npm dependencies
--  [ ] Add "Fork this val" button
--  [ ] Show usage stats (if available via API)
-
-### Phase 6: Launch (Week 4)
-
--  [ ] Write comprehensive README
--  [ ] Create demo video/screenshots
--  [ ] Test with various public vals
--  [ ] Publish to Val Town
--  [ ] Share on Val Town community
--  [ ] Gather feedback
-
-## Future Enhancements (Post-v1)
-
-### v2 Features
-
--  Multi-val documentation (entire projects)
--  Custom theming (allow users to customize colors/fonts)
--  Export to PDF/markdown
--  Permalink support for specific functions
--  "Edit on Val Town" live preview
--  AI-generated summaries for undocumented code
-
-### v3 Features
-
--  Private val documentation (OAuth)
--  Team/organization documentation hubs
--  Version comparison (show API changes between versions)
--  Dependency tree visualization
--  Interactive API playground (test endpoints)
--  Usage analytics (which docs are most viewed)
-
-## Technical Considerations
-
-### TypeScript Parsing Edge Cases
-
--  Dynamic imports
--  Re-exports (`export * from`)
--  Namespace exports
--  Conditional types
--  Template literal types
--  Decorators (if supported)
-
-### Val Town-Specific Considerations
-
--  Handle Deno-style imports (`npm:`, `jsr:`, ESM URLs)
--  Support Val Town standard library references
--  Handle val-to-val imports (`@username.valname`)
--  Respect Val Town privacy settings
-
-### Security Considerations
-
--  Sanitize all user input (val identifiers)
--  Escape HTML in rendered docs
--  Rate limit documentation requests
--  Don't execute user code during parsing
--  Validate TypeScript before parsing (protect against malicious AST)
-
-## Success Metrics
-
-### Usage Metrics
-
--  Number of unique vals documented
--  Number of unique users
--  Repeat usage rate
--  Cache hit rate
-
-### Quality Metrics
-
--  Parse success rate (% of vals that parse without errors)
--  User feedback (thumbs up/down)
--  Time to generate docs (performance)
-
-### Community Metrics
-
--  Forks of the doc generator val
--  Mentions in Val Town community
--  Integration into other tools
-
-## Resources & References
-
-### Documentation
-
--  [TypeScript Compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API)
--  [TSDoc Standard](https://tsdoc.org/)
--  [Val Town API Docs](https://docs.val.town/api/overview)
--  [Deno TypeScript Docs](https://docs.deno.com/runtime/manual/advanced/typescript/)
-
-### Inspiration
-
--  [TypeDoc](https://typedoc.org/) - Industry standard
--  [API Extractor](https://api-extractor.com/) - Microsoft's approach
--  [Scalar API Reference](https://github.com/scalar/scalar) - Modern API docs UI
--  [Stripe API Docs](https://stripe.com/docs/api) - Best-in-class design
-
-### Similar Tools
-
--  [TypeDoc](https://typedoc.org/)
--  [TSDoc](https://tsdoc.org/)
--  [documentation.js](https://github.com/documentationjs/documentation)
--  [API Extractor](https://api-extractor.com/)
+**Preconditions:** Core functionality stable (Steps 1–6).
+**Postconditions:** Observability and docs in place; rate limiting prevents abuse.
+**Checks:** Manual smoke tests, documentation review.
 
 ## Open Questions
 
-1. **Versioning**: Should we support generating docs for specific val versions, or always use latest?
-2. **Private vals**: Is OAuth integration worth the complexity for v1?
-3. **Multi-file vals**: Should v1 support project-style vals with multiple files, or just single-file vals?
-4. **Embedding**: Should we provide an iframe-embeddable version for use in other sites?
-5. **API vs UI**: Should we expose a JSON API endpoint separate from the UI?
-6. **Custom domains**: If a user has a custom domain for their val, should docs respect that?
+-  Confirm whether we must support fetching specific val versions (e.g., `?version=` query) in v1 or default to latest only.
+-  Clarify if Tailwind via Twind CDN is acceptable for production or if inline Tailwind build step is preferred.
+-  Determine acceptable rate limit thresholds and logging retention (where should logs emit?).
 
-## Decision Log
+## Resources
 
-### Why custom parser instead of TypeDoc?
-
--  More control over output format
--  Easier to add Val Town-specific features
--  Lighter weight for serverless deployment
--  Can iterate faster on UI/UX
-
-### Why React instead of server-rendered HTML?
-
--  Better interactivity (search, filter, collapse)
--  Cleaner separation of data and presentation
--  Easier to add features like dark mode toggle
--  Modern user experience
-
-### Why blob storage for cache instead of KV store?
-
--  Larger storage limits
--  Can store rendered HTML or large JSON structures
--  Built-in Val Town support
-
-## Contact & Feedback
-
-This project is open for feedback and contributions. Key areas where input would be valuable:
-
--  UI/UX design preferences
--  Additional JSDoc tags to support
--  Val Town-specific features to highlight
--  Performance optimization suggestions
-
----
-
-## Getting Started
-
-To begin implementation:
-
-1. Create a new val called `docGenerator`
-2. Start with Phase 1: Core Parsing
-3. Test with a simple example val
-4. Iterate based on results
-5. Move to Phase 2 once core parsing works
-
-Good luck! 🚀
+-  Build/test: `deno task check`, `deno test`, `deno lint`, `biome check .`
+-  Docs: [Val Town API](https://docs.val.town/api/overview), [TypeScript Compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API), [TSDoc Spec](https://tsdoc.org/).
+-  Reference vals: `https://www.val.town/v/std/utils@85-main/index.ts`, `https://www.val.town/v/std/blob`.
