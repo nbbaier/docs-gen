@@ -3,7 +3,7 @@
  * Uses the TypeScript Compiler API to walk the AST and extract exports
  */
 
-import * as ts from "npm:typescript@5.3.3";
+import ts from "npm:typescript@5.3.3";
 import type {
 	ClassDoc,
 	ConstantDoc,
@@ -54,14 +54,17 @@ function parseJSDocComment(
 	const paramTags = jsDocTags.filter((tag) => tag.tagName.text === "param");
 	if (paramTags.length > 0) {
 		docComment.params = paramTags.map((tag) => {
-			const name = tag.comment ? String(tag.comment).split(" ")[0] : "";
-			const desc = tag.comment
-				? String(tag.comment).substring(name.length).trim()
-				: "";
+			const paramTag = tag as ts.JSDocParameterTag;
+			const name = paramTag.name ? paramTag.name.getText(sourceFile) : "";
+			const desc = typeof tag.comment === "string" 
+				? tag.comment 
+				: tag.comment 
+					? tag.comment.map((part) => part.text).join("") 
+					: "";
 			return {
 				name,
 				type: undefined,
-				description: desc,
+				description: desc.trim(),
 			};
 		});
 	}
@@ -569,8 +572,8 @@ export function parseValBundle(bundle: ValBundle): DocManifest {
 	}
 
 	const compilerOptions: ts.CompilerOptions = {
-		target: ts.ScriptTarget.ES2020,
-		module: ts.ModuleKind.ESNext,
+		target: 6, // ES2020
+		module: 99, // ESNext
 		lib: ["lib.es2020.d.ts", "lib.dom.d.ts"],
 		allowJs: true,
 		checkJs: false,
@@ -584,7 +587,7 @@ export function parseValBundle(bundle: ValBundle): DocManifest {
 				return ts.createSourceFile(
 					fileName,
 					content,
-					ts.ScriptTarget.ES2020,
+					6, // ES2020
 					true,
 				);
 			}
