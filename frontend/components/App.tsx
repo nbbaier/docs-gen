@@ -27,6 +27,7 @@ export function App(props: AppProps) {
   const fetchDocs = async (valIdentifier: string, refresh = false) => {
     if (!valIdentifier) return;
 
+    console.log(`[fetchDocs] Requesting docs for val: ${valIdentifier}, refresh: ${refresh}`);
     setLoading(true);
     setError(null);
 
@@ -34,14 +35,19 @@ export function App(props: AppProps) {
       const url = `/api/docs?val=${encodeURIComponent(valIdentifier)}${
         refresh ? "&refresh=true" : ""
       }`;
+      console.log(`[fetchDocs] Fetching from URL: ${url}`);
+      
       const response = await fetch(url);
+      console.log(`[fetchDocs] Response status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error(`[fetchDocs] Error response:`, errorData);
         throw new Error(errorData.message || "Failed to fetch documentation");
       }
 
       const data = await response.json();
+      console.log(`[fetchDocs] Successfully fetched docs:`, data);
       setManifest(data);
       setVal(valIdentifier);
 
@@ -49,6 +55,7 @@ export function App(props: AppProps) {
       const newUrl = `/?val=${encodeURIComponent(valIdentifier)}`;
       window.history.pushState({}, "", newUrl);
     } catch (err) {
+      console.error(`[fetchDocs] Error caught:`, err);
       setError(err instanceof Error ? err.message : "Unknown error");
       setManifest(null);
     } finally {

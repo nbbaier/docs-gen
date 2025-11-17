@@ -2,8 +2,8 @@
  * Val Town API client for fetching val metadata and source code
  * Uses the official @valtown/sdk for API interactions
  */
-
-import ValTown from "@valtown/sdk";
+``;
+import ValTown from "npm:@valtown/sdk";
 import type { ValMetadata } from "../../shared/docTypes.ts";
 
 /**
@@ -42,14 +42,20 @@ export function parseValIdentifier(val: string): {
 /**
  * Fetch val metadata using the official Val Town SDK
  */
-async function fetchValMetadata(
+export async function fetchValMetadata(
   client: ValTown,
   username: string,
   valname: string,
 ): Promise<ValMetadata> {
   try {
     // Use the SDK's alias retrieve method to fetch val metadata
-    const val = await client.alias.username.valName.retrieve(username, valname);
+    console.log(
+      `[valFetchr] calling client.alias.username.valName.retrieve(${valname}, {
+     username: ${username}`,
+    );
+    const val = await client.alias.username.valName.retrieve(valname, {
+      username,
+    });
 
     // Map SDK response to our ValMetadata format
     return {
@@ -67,7 +73,9 @@ async function fetchValMetadata(
     };
   } catch (error) {
     if (error instanceof ValTown.NotFoundError) {
-      throw new Error(`Val not found: ${username}/${valname}`);
+      throw new Error(
+        `Val not found: ${username}/${valname} (looked for v:${valname}, u:${username} `,
+      );
     }
     throw new Error(`Failed to fetch val metadata: ${error.message}`);
   }
@@ -82,7 +90,8 @@ async function fetchValSource(
 ): Promise<string> {
   try {
     // Use the SDK's files.getContent method to fetch val source code
-    const response = await client.vals.files.getContent(valId);
+    // The path parameter is required - use "/" for the main file
+    const response = await client.vals.files.getContent(valId, { path: "/" });
 
     // The response is a blob/stream, convert it to text
     return await response.text();
