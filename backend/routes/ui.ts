@@ -2,12 +2,17 @@
  * UI routes for serving the documentation viewer
  */
 
-import type { Context } from "npm:hono@4.0.0";
 import { readFile } from "https://esm.town/v/std/utils@85-main/index.ts";
+import type { Context } from "npm:hono@4.0.0";
 import { generateDocs, updateCachedHtml } from "../services/docService.ts";
 
 /**
- * Render the HTML page with optional initial data
+ * Renders the HTML index page with optional initial data injected.
+ *
+ * Injects data into a script tag to avoid extra round-trips on initial page load.
+ *
+ * @param data - Initial data to inject (manifest, val identifier, or error)
+ * @returns HTML string with injected data
  */
 async function renderIndexPage(data: {
   manifest?: unknown;
@@ -28,7 +33,17 @@ async function renderIndexPage(data: {
 
 /**
  * GET /
- * Serves the documentation viewer UI
+ *
+ * Serves the documentation viewer UI.
+ *
+ * Query parameters:
+ * - `val` (optional): Val identifier in format "username/valname"
+ *
+ * If a val is specified, attempts to load cached documentation and inject it
+ * into the page. Falls back to empty UI if no val is provided.
+ *
+ * @param c - Hono context object
+ * @returns HTML response with the documentation viewer UI
  */
 export async function getUI(c: Context) {
   const initialVal = c.req.query("val");

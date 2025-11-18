@@ -1,13 +1,24 @@
 /** @jsxImportSource https://esm.sh/react@18.2.0 */
 
 import type { ClassDoc } from "../../shared/docTypes.ts";
-import { CodeBlock } from "./CodeBlock.tsx";
 import { DocCommentDisplay } from "./DocCommentDisplay.tsx";
 
+/**
+ * Props for the ClassDocCard component.
+ */
 export interface ClassDocCardProps {
+  /** Class documentation to display */
   cls: ClassDoc;
 }
 
+/**
+ * Component for displaying class documentation.
+ *
+ * Shows class name, extends/implements clauses, constructor, properties, methods, and JSDoc comments.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function ClassDocCard(props: ClassDocCardProps) {
   const { cls } = props;
 
@@ -16,7 +27,9 @@ export function ClassDocCard(props: ClassDocCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold text-gray-900 mb-1">
-            {cls.isAbstract && <span className="text-purple-600">abstract </span>}
+            {cls.isAbstract && (
+              <span className="text-purple-600">abstract </span>
+            )}
             class {cls.name}
           </h3>
           <span className="text-xs text-gray-500">
@@ -24,7 +37,8 @@ export function ClassDocCard(props: ClassDocCardProps) {
           </span>
           {cls.extends && (
             <p className="text-sm text-gray-600 mt-1">
-              extends <code className="bg-gray-100 px-1 rounded">{cls.extends}</code>
+              extends{" "}
+              <code className="bg-gray-100 px-1 rounded">{cls.extends}</code>
             </p>
           )}
           {cls.implements && cls.implements.length > 0 && (
@@ -33,7 +47,7 @@ export function ClassDocCard(props: ClassDocCardProps) {
               {cls.implements.map((impl, i) => (
                 <span key={impl}>
                   <code className="bg-gray-100 px-1 rounded">{impl}</code>
-                  {i < cls.implements!.length - 1 && ", "}
+                  {i < cls.implements?.length - 1 && ", "}
                 </span>
               ))}
             </p>
@@ -50,7 +64,9 @@ export function ClassDocCard(props: ClassDocCardProps) {
 
       {cls.constructor && (
         <div className="mt-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Constructor</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">
+            Constructor
+          </h4>
           <div className="bg-gray-50 p-3 rounded">
             {cls.constructor.parameters.length > 0 && (
               <table className="w-full text-sm">
@@ -63,8 +79,12 @@ export function ClassDocCard(props: ClassDocCardProps) {
                 <tbody>
                   {cls.constructor.parameters.map((param) => (
                     <tr key={param.name}>
-                      <td className="py-1 px-2 font-mono text-blue-600">{param.name}</td>
-                      <td className="py-1 px-2 font-mono text-xs">{param.type}</td>
+                      <td className="py-1 px-2 font-mono text-blue-600">
+                        {param.name}
+                      </td>
+                      <td className="py-1 px-2 font-mono text-xs">
+                        {param.type}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -76,7 +96,9 @@ export function ClassDocCard(props: ClassDocCardProps) {
 
       {cls.properties.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Properties</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">
+            Properties
+          </h4>
           <div className="space-y-2">
             {cls.properties.map((prop) => (
               <div key={prop.name} className="bg-gray-50 p-3 rounded">
@@ -85,7 +107,9 @@ export function ClassDocCard(props: ClassDocCardProps) {
                     {prop.visibility !== "public" && (
                       <span className="text-gray-500">{prop.visibility} </span>
                     )}
-                    {prop.isReadonly && <span className="text-purple-600">readonly </span>}
+                    {prop.isReadonly && (
+                      <span className="text-purple-600">readonly </span>
+                    )}
                     {prop.name}: {prop.type}
                   </span>
                   {prop.isOptional && (
@@ -113,8 +137,12 @@ export function ClassDocCard(props: ClassDocCardProps) {
                   {method.visibility !== "public" && (
                     <span className="text-gray-500">{method.visibility} </span>
                   )}
-                  {method.isStatic && <span className="text-purple-600">static </span>}
-                  {method.isAsync && <span className="text-purple-600">async </span>}
+                  {method.isStatic && (
+                    <span className="text-purple-600">static </span>
+                  )}
+                  {method.isAsync && (
+                    <span className="text-purple-600">async </span>
+                  )}
                   {method.name}()
                 </div>
                 {method.comment && (

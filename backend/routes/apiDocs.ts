@@ -7,7 +7,15 @@ import { generateDocs } from "../services/docService.ts";
 
 /**
  * GET /api/docs
- * Returns documentation manifest as JSON
+ *
+ * Returns documentation manifest as JSON for a given val.
+ *
+ * Query parameters:
+ * - `val` (required): Val identifier in format "username/valname"
+ * - `refresh` (optional): Set to "true" to bypass cache and regenerate docs
+ *
+ * @param c - Hono context object
+ * @returns JSON response with documentation manifest or error details
  */
 export async function getApiDocs(c: Context) {
   const val = c.req.query("val");

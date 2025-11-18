@@ -4,10 +4,22 @@ import type { TypeAliasDoc } from "../../shared/docTypes.ts";
 import { CodeBlock } from "./CodeBlock.tsx";
 import { DocCommentDisplay } from "./DocCommentDisplay.tsx";
 
+/**
+ * Props for the TypeDocCard component.
+ */
 export interface TypeDocCardProps {
+  /** Type alias documentation to display */
   type: TypeAliasDoc;
 }
 
+/**
+ * Component for displaying type alias documentation.
+ *
+ * Shows type name, definition, and JSDoc comments.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function TypeDocCard(props: TypeDocCardProps) {
   const { type } = props;
 
@@ -33,7 +45,10 @@ export function TypeDocCard(props: TypeDocCardProps) {
 
       <div className="mt-4">
         <h4 className="text-sm font-semibold text-gray-700 mb-2">Definition</h4>
-        <CodeBlock code={`type ${type.name} = ${type.type}`} language="typescript" />
+        <CodeBlock
+          code={`type ${type.name} = ${type.type}`}
+          language="typescript"
+        />
       </div>
     </div>
   );

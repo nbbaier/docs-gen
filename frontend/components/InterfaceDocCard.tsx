@@ -3,15 +3,30 @@
 import type { InterfaceDoc } from "../../shared/docTypes.ts";
 import { DocCommentDisplay } from "./DocCommentDisplay.tsx";
 
+/**
+ * Props for the InterfaceDocCard component.
+ */
 export interface InterfaceDocCardProps {
+  /** Interface documentation to display */
   iface: InterfaceDoc;
 }
 
+/**
+ * Component for displaying interface documentation.
+ *
+ * Shows interface name, extends clauses, properties, methods, and JSDoc comments.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function InterfaceDocCard(props: InterfaceDocCardProps) {
   const { iface } = props;
 
   return (
-    <div id={`interface-${iface.name}`} className="bg-white rounded-lg shadow-md p-6">
+    <div
+      id={`interface-${iface.name}`}
+      className="bg-white rounded-lg shadow-md p-6"
+    >
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold text-gray-900 mb-1">
@@ -26,7 +41,7 @@ export function InterfaceDocCard(props: InterfaceDocCardProps) {
               {iface.extends.map((ext, i) => (
                 <span key={ext}>
                   <code className="bg-gray-100 px-1 rounded">{ext}</code>
-                  {i < iface.extends!.length - 1 && ", "}
+                  {i < iface.extends?.length - 1 && ", "}
                 </span>
               ))}
             </p>
@@ -43,14 +58,19 @@ export function InterfaceDocCard(props: InterfaceDocCardProps) {
 
       {iface.properties.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Properties</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">
+            Properties
+          </h4>
           <div className="space-y-2">
             {iface.properties.map((prop) => (
               <div key={prop.name} className="bg-gray-50 p-3 rounded">
                 <div className="flex items-start justify-between">
                   <span className="font-mono text-sm text-blue-600">
-                    {prop.isReadonly && <span className="text-purple-600">readonly </span>}
-                    {prop.name}{prop.isOptional && "?"}: {prop.type}
+                    {prop.isReadonly && (
+                      <span className="text-purple-600">readonly </span>
+                    )}
+                    {prop.name}
+                    {prop.isOptional && "?"}: {prop.type}
                   </span>
                 </div>
                 {prop.comment && (

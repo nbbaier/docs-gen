@@ -2,11 +2,25 @@
 
 import type { DocManifest } from "../../shared/docTypes.ts";
 
+/**
+ * Props for the Sidebar component.
+ */
 export interface SidebarProps {
+  /** Documentation manifest to display */
   manifest: DocManifest;
+  /** Current search query for filtering */
   searchQuery: string;
 }
 
+/**
+ * Sidebar component displaying navigation for all exports in the manifest.
+ *
+ * Shows val info, and filtered lists of functions, classes, interfaces, types, and constants.
+ * Provides click handlers to scroll to each item in the main content.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function Sidebar(props: SidebarProps) {
   const { manifest, searchQuery } = props;
   const query = searchQuery.toLowerCase();
@@ -37,7 +51,12 @@ export function Sidebar(props: SidebarProps) {
         {manifest.exports.functions.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Functions ({manifest.exports.functions.filter(f => filterBySearch(f.name)).length})
+              Functions (
+              {
+                manifest.exports.functions.filter((f) => filterBySearch(f.name))
+                  .length
+              }
+              )
             </h3>
             <ul className="space-y-1">
               {manifest.exports.functions
@@ -45,6 +64,7 @@ export function Sidebar(props: SidebarProps) {
                 .map((func) => (
                   <li key={func.name}>
                     <button
+                      type="button"
                       onClick={() => scrollToElement(`func-${func.name}`)}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left w-full"
                     >
@@ -59,7 +79,12 @@ export function Sidebar(props: SidebarProps) {
         {manifest.exports.classes.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Classes ({manifest.exports.classes.filter(c => filterBySearch(c.name)).length})
+              Classes (
+              {
+                manifest.exports.classes.filter((c) => filterBySearch(c.name))
+                  .length
+              }
+              )
             </h3>
             <ul className="space-y-1">
               {manifest.exports.classes
@@ -67,6 +92,7 @@ export function Sidebar(props: SidebarProps) {
                 .map((cls) => (
                   <li key={cls.name}>
                     <button
+                      type="button"
                       onClick={() => scrollToElement(`class-${cls.name}`)}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left w-full"
                     >
@@ -81,7 +107,13 @@ export function Sidebar(props: SidebarProps) {
         {manifest.exports.interfaces.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Interfaces ({manifest.exports.interfaces.filter(i => filterBySearch(i.name)).length})
+              Interfaces (
+              {
+                manifest.exports.interfaces.filter((i) =>
+                  filterBySearch(i.name),
+                ).length
+              }
+              )
             </h3>
             <ul className="space-y-1">
               {manifest.exports.interfaces
@@ -89,6 +121,7 @@ export function Sidebar(props: SidebarProps) {
                 .map((iface) => (
                   <li key={iface.name}>
                     <button
+                      type="button"
                       onClick={() => scrollToElement(`interface-${iface.name}`)}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left w-full"
                     >
@@ -103,7 +136,12 @@ export function Sidebar(props: SidebarProps) {
         {manifest.exports.types.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Types ({manifest.exports.types.filter(t => filterBySearch(t.name)).length})
+              Types (
+              {
+                manifest.exports.types.filter((t) => filterBySearch(t.name))
+                  .length
+              }
+              )
             </h3>
             <ul className="space-y-1">
               {manifest.exports.types
@@ -111,6 +149,7 @@ export function Sidebar(props: SidebarProps) {
                 .map((type) => (
                   <li key={type.name}>
                     <button
+                      type="button"
                       onClick={() => scrollToElement(`type-${type.name}`)}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left w-full"
                     >
@@ -125,7 +164,12 @@ export function Sidebar(props: SidebarProps) {
         {manifest.exports.constants.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Constants ({manifest.exports.constants.filter(c => filterBySearch(c.name)).length})
+              Constants (
+              {
+                manifest.exports.constants.filter((c) => filterBySearch(c.name))
+                  .length
+              }
+              )
             </h3>
             <ul className="space-y-1">
               {manifest.exports.constants
@@ -133,6 +177,7 @@ export function Sidebar(props: SidebarProps) {
                 .map((constant) => (
                   <li key={constant.name}>
                     <button
+                      type="button"
                       onClick={() => scrollToElement(`const-${constant.name}`)}
                       className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left w-full"
                     >

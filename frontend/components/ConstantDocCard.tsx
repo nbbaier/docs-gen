@@ -4,15 +4,30 @@ import type { ConstantDoc } from "../../shared/docTypes.ts";
 import { CodeBlock } from "./CodeBlock.tsx";
 import { DocCommentDisplay } from "./DocCommentDisplay.tsx";
 
+/**
+ * Props for the ConstantDocCard component.
+ */
 export interface ConstantDocCardProps {
+  /** Constant documentation to display */
   constant: ConstantDoc;
 }
 
+/**
+ * Component for displaying constant/variable documentation.
+ *
+ * Shows constant name, type, value, and JSDoc comments.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function ConstantDocCard(props: ConstantDocCardProps) {
   const { constant } = props;
 
   return (
-    <div id={`const-${constant.name}`} className="bg-white rounded-lg shadow-md p-6">
+    <div
+      id={`const-${constant.name}`}
+      className="bg-white rounded-lg shadow-md p-6"
+    >
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-xl font-bold text-gray-900 mb-1">
@@ -35,7 +50,9 @@ export function ConstantDocCard(props: ConstantDocCardProps) {
         <div className="flex items-center space-x-4">
           <div>
             <span className="text-sm font-semibold text-gray-700">Type: </span>
-            <code className="text-sm bg-gray-100 px-2 py-1 rounded">{constant.type}</code>
+            <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+              {constant.type}
+            </code>
           </div>
         </div>
       </div>

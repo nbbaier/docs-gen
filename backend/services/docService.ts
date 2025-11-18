@@ -4,24 +4,27 @@
  */
 
 import type { DocManifest } from "../../shared/docTypes.ts";
-import { valFetcher } from "./valFetcher.ts";
 import { deriveCacheKey, docCache } from "./docCache.ts";
 import { parseValBundle } from "./tsParser.ts";
+import { valFetcher } from "./valFetcher.ts";
 
 /**
- * Cached documentation payload
+ * Cached documentation payload containing manifest and optional SSR HTML.
  */
 export interface CachedDocPayload {
+  /** The documentation manifest */
   manifest: DocManifest;
+  /** Server-side rendered HTML (optional, cached for performance) */
   ssrHtml?: string;
+  /** Timestamp when the payload was cached (milliseconds since epoch) */
   cachedAt: number;
 }
 
 /**
- * Generation options
+ * Options for documentation generation.
  */
 export interface GenerateDocsOptions {
-  /** Force refresh, bypassing cache */
+  /** If true, bypasses cache and regenerates documentation */
   refresh?: boolean;
 }
 
@@ -69,14 +72,20 @@ export async function generateDocs(
 }
 
 /**
- * Refresh documentation in the cache
+ * Forces a refresh of documentation for a val, bypassing cache.
+ *
+ * @param val - Val identifier in format "username/valname"
+ * @returns Freshly generated documentation payload
  */
 export async function refreshDocs(val: string): Promise<CachedDocPayload> {
   return generateDocs(val, { refresh: true });
 }
 
 /**
- * Get cached documentation without generating
+ * Retrieves cached documentation without generating new documentation.
+ *
+ * @param val - Val identifier in format "username/valname"
+ * @returns Cached documentation payload if available, null otherwise
  */
 export async function getCachedDocs(
   val: string,
@@ -86,7 +95,10 @@ export async function getCachedDocs(
 }
 
 /**
- * Update SSR HTML in cache
+ * Updates the SSR HTML in the cached documentation payload.
+ *
+ * @param val - Val identifier in format "username/valname"
+ * @param html - The HTML string to cache
  */
 export async function updateCachedHtml(
   val: string,
@@ -104,7 +116,9 @@ export async function updateCachedHtml(
 }
 
 /**
- * Clear documentation cache for a specific val
+ * Clears the documentation cache for a specific val.
+ *
+ * @param val - Val identifier in format "username/valname"
  */
 export async function clearValCache(val: string): Promise<void> {
   const cacheKey = deriveCacheKey(val);
@@ -113,7 +127,9 @@ export async function clearValCache(val: string): Promise<void> {
 }
 
 /**
- * Clear all documentation caches
+ * Clears all documentation caches.
+ *
+ * Removes all cached documentation from both memory and blob storage.
  */
 export async function clearAllCaches(): Promise<void> {
   await docCache.clear();

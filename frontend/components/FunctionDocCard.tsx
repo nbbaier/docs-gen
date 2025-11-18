@@ -4,10 +4,22 @@ import type { FunctionDoc } from "../../shared/docTypes.ts";
 import { CodeBlock } from "./CodeBlock.tsx";
 import { DocCommentDisplay } from "./DocCommentDisplay.tsx";
 
+/**
+ * Props for the FunctionDocCard component.
+ */
 export interface FunctionDocCardProps {
+  /** Function documentation to display */
   func: FunctionDoc;
 }
 
+/**
+ * Component for displaying function documentation.
+ *
+ * Shows function name, signature, parameters, return type, and JSDoc comments.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function FunctionDocCard(props: FunctionDocCardProps) {
   const { func } = props;
 
@@ -39,7 +51,9 @@ export function FunctionDocCard(props: FunctionDocCardProps) {
 
       {func.parameters.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Parameters</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">
+            Parameters
+          </h4>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
@@ -52,7 +66,9 @@ export function FunctionDocCard(props: FunctionDocCardProps) {
             <tbody>
               {func.parameters.map((param) => (
                 <tr key={param.name} className="border-b">
-                  <td className="py-2 px-2 font-mono text-blue-600">{param.name}</td>
+                  <td className="py-2 px-2 font-mono text-blue-600">
+                    {param.name}
+                  </td>
                   <td className="py-2 px-2 font-mono text-xs">{param.type}</td>
                   <td className="py-2 px-2">{param.optional ? "Yes" : "No"}</td>
                   <td className="py-2 px-2 font-mono text-xs">
@@ -67,7 +83,9 @@ export function FunctionDocCard(props: FunctionDocCardProps) {
 
       <div className="mt-4">
         <h4 className="text-sm font-semibold text-gray-700 mb-2">Returns</h4>
-        <code className="text-sm bg-gray-100 px-2 py-1 rounded">{func.returnType}</code>
+        <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+          {func.returnType}
+        </code>
       </div>
     </div>
   );

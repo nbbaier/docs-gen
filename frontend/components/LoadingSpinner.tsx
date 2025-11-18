@@ -1,5 +1,10 @@
 /** @jsxImportSource https://esm.sh/react@18.2.0 */
 
+/**
+ * Component for displaying a loading spinner with message.
+ *
+ * @returns React element
+ */
 export function LoadingSpinner() {
   return (
     <div className="flex flex-col items-center justify-center py-12">

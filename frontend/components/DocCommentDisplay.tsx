@@ -2,10 +2,22 @@
 
 import type { DocComment } from "../../shared/docTypes.ts";
 
+/**
+ * Props for the DocCommentDisplay component.
+ */
 export interface DocCommentDisplayProps {
+  /** Documentation comment to display */
   comment: DocComment;
 }
 
+/**
+ * Component for displaying parsed JSDoc comments.
+ *
+ * Renders description, @param tags, @returns tag, @example tags, and @deprecated warnings.
+ *
+ * @param props - Component props
+ * @returns React element
+ */
 export function DocCommentDisplay(props: DocCommentDisplayProps) {
   const { comment } = props;
 
@@ -34,10 +46,14 @@ export function DocCommentDisplay(props: DocCommentDisplayProps) {
                   {param.name}
                 </code>
                 {param.type && (
-                  <span className="text-gray-500 text-xs ml-1">({param.type})</span>
+                  <span className="text-gray-500 text-xs ml-1">
+                    ({param.type})
+                  </span>
                 )}
                 {param.description && (
-                  <span className="text-gray-600 ml-2">- {param.description}</span>
+                  <span className="text-gray-600 ml-2">
+                    {param.description}
+                  </span>
                 )}
               </li>
             ))}

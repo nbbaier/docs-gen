@@ -5,39 +5,84 @@
 import { blob } from "https://esm.town/v/std/blob";
 
 /**
- * Cache entry metadata
+ * Cache entry with metadata for expiration and versioning.
+ *
+ * @template T - Type of cached data
  */
 export interface CacheEntry<T> {
+  /** Cached data */
   data: T;
+  /** Version identifier for cache invalidation */
   version: string;
+  /** Timestamp when entry was cached (milliseconds since epoch) */
   cachedAt: number;
+  /** Timestamp when entry expires (milliseconds since epoch) */
   expiresAt: number;
 }
 
 /**
- * Cache configuration
+ * Configuration options for documentation cache.
  */
 export interface CacheConfig {
-  /** Cache TTL in milliseconds (default: 1 hour) */
+  /** Cache time-to-live in milliseconds (default: 1 hour) */
   ttlMs?: number;
-  /** Blob key prefix (default: "doc-cache") */
+  /** Prefix for blob storage keys (default: "doc-cache") */
   blobPrefix?: string;
 }
 
 /**
- * Documentation cache interface
+ * Interface for documentation cache operations.
+ *
+ * Provides a two-tier caching system: in-memory LRU cache with blob storage fallback.
  */
 export interface DocCache {
+  /**
+   * Retrieves cached data by key.
+   *
+   * @template T - Type of cached data
+   * @param key - Cache key
+   * @returns Cached data if found and not expired, null otherwise
+   */
   get<T>(key: string): Promise<T | null>;
+  /**
+   * Stores data in cache with version metadata.
+   *
+   * @template T - Type of data to cache
+   * @param key - Cache key
+   * @param data - Data to cache
+   * @param metadata - Cache metadata including version
+   */
   set<T>(key: string, data: T, metadata: { version: string }): Promise<void>;
+  /**
+   * Checks if a key exists in cache and is not expired.
+   *
+   * @param key - Cache key
+   * @returns True if key exists and is valid, false otherwise
+   */
   has(key: string): Promise<boolean>;
+  /**
+   * Checks if a cache entry is expired.
+   *
+   * @param key - Cache key
+   * @returns True if expired or doesn't exist, false if valid
+   */
   isExpired(key: string): Promise<boolean>;
+  /**
+   * Deletes a cache entry by key.
+   *
+   * @param key - Cache key
+   */
   delete(key: string): Promise<void>;
+  /**
+   * Clears all cache entries.
+   */
   clear(): Promise<void>;
 }
 
 /**
- * In-memory cache with LRU eviction
+ * In-memory cache with LRU (Least Recently Used) eviction policy.
+ *
+ * Maintains a fixed-size cache, automatically evicting the oldest entry when at capacity.
  */
 class MemoryCache {
   private cache = new Map<string, CacheEntry<unknown>>();
@@ -89,7 +134,12 @@ class MemoryCache {
 }
 
 /**
- * Create a documentation cache instance
+ * Creates a documentation cache instance with two-tier storage.
+ *
+ * Uses in-memory LRU cache for fast access and blob storage for persistence.
+ *
+ * @param config - Cache configuration options
+ * @returns Configured DocCache instance
  */
 export function createDocCache(config: CacheConfig = {}): DocCache {
   const ttlMs = config.ttlMs ?? 60 * 60 * 1000; // 1 hour default
@@ -112,7 +162,7 @@ export function createDocCache(config: CacheConfig = {}): DocCache {
 
       // Fall back to blob storage
       const blobKey = deriveBlobKey(key);
-      const blobEntry = await blob.getJSON(blobKey) as CacheEntry<T> | null;
+      const blobEntry = (await blob.getJSON(blobKey)) as CacheEntry<T> | null;
 
       if (!blobEntry) {
         return null;
@@ -161,8 +211,9 @@ export function createDocCache(config: CacheConfig = {}): DocCache {
 
       // Check blob
       const blobKey = deriveBlobKey(key);
-      const blobEntry = await blob.getJSON(blobKey) as CacheEntry<unknown> |
-        null;
+      const blobEntry = (await blob.getJSON(
+        blobKey,
+      )) as CacheEntry<unknown> | null;
 
       if (!blobEntry) {
         return false;
@@ -191,7 +242,13 @@ export function createDocCache(config: CacheConfig = {}): DocCache {
 }
 
 /**
- * Derive cache key from val identifier and version
+ * Derives a normalized cache key from a val identifier and optional version.
+ *
+ * Normalizes the val identifier by lowercasing and replacing invalid characters.
+ *
+ * @param val - Val identifier in format "username/valname"
+ * @param version - Optional version string to append
+ * @returns Normalized cache key
  */
 export function deriveCacheKey(val: string, version?: string): string {
   const normalized = val.toLowerCase().replace(/[^a-z0-9_/-]/g, "_");
@@ -199,7 +256,9 @@ export function deriveCacheKey(val: string, version?: string): string {
 }
 
 /**
- * Default doc cache instance with 1 hour TTL
+ * Default documentation cache instance with 1 hour TTL.
+ *
+ * Uses "doc-manifest" as the blob storage prefix.
  */
 export const docCache = createDocCache({
   ttlMs: 60 * 60 * 1000,

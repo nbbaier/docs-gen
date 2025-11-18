@@ -1,13 +1,18 @@
 # Val Town Documentation Generator
 
-Automatically generate beautiful, interactive documentation for your Val Town vals by parsing TypeScript AST and extracting functions, classes, interfaces, types, and constants with their JSDoc comments.
+Automatically generate beautiful, interactive documentation for your Val Town
+vals by parsing TypeScript AST and extracting functions, classes, interfaces,
+types, and constants with their JSDoc comments.
 
 ## Features
 
-- 📝 **Automatic Code Parsing** - Extracts functions, classes, interfaces, type aliases, and constants
-- 💬 **JSDoc Support** - Parses `@param`, `@returns`, `@example`, and `@deprecated` tags
+- 📝 **Automatic Code Parsing** - Extracts functions, classes, interfaces, type
+  aliases, and constants
+- 💬 **JSDoc Support** - Parses `@param`, `@returns`, `@example`, and
+  `@deprecated` tags
 - 🔍 **Search & Filter** - Quickly find what you're looking for
-- ⚡ **Fast Caching** - Sub-second responses for cached documentation (1-hour TTL)
+- ⚡ **Fast Caching** - Sub-second responses for cached documentation (1-hour
+  TTL)
 - 🎨 **Clean UI** - Responsive design with Tailwind CSS via Twind
 - 🚀 **Serverless** - Runs on Val Town's serverless platform
 
@@ -22,15 +27,18 @@ GET /api/docs?val=username/valname
 ```
 
 **Query Parameters:**
+
 - `val` (required) - Val identifier in format `username/valname`
 - `refresh` (optional) - Set to `true` to bypass cache
 
 **Example:**
+
 ```bash
-curl "https://your-val.val.town/api/docs?val=stevekrouse/example"
+curl "https://docs-gen.val.run/api/docs?val=stevekrouse/example"
 ```
 
 **Response:**
+
 ```json
 {
   "val": "stevekrouse/example",
@@ -53,10 +61,11 @@ curl "https://your-val.val.town/api/docs?val=stevekrouse/example"
 Visit the root URL with a val query parameter to view interactive documentation:
 
 ```
-https://your-val.val.town/?val=username/valname
+https://docs-gen.val.run/?val=username/valname
 ```
 
 The UI provides:
+
 - Searchable sidebar navigation
 - Syntax-highlighted code examples
 - Detailed parameter and return type information
@@ -120,6 +129,7 @@ The UI provides:
 ### 3. TypeScript Parsing
 
 Uses the TypeScript Compiler API to:
+
 - Create an in-memory compiler host
 - Parse source files into AST
 - Walk nodes to extract declarations
@@ -203,14 +213,16 @@ await cache.delete(key: string)
 2. Deploy to Val Town as an HTTP val
 3. Test with a public val:
    ```
-   https://your-val.val.town/?val=stevekrouse/example
+   https://docs-gen.val.run/?val=stevekrouse/example
    ```
 
 ### Deployment
 
-This project is designed to run as a Val Town HTTP val. The entry point is `backend/docGenerator.http.ts`.
+This project is designed to run as a Val Town HTTP val. The entry point is
+`backend/docGenerator.http.ts`.
 
 To deploy:
+
 1. Create a new HTTP val in Val Town
 2. Copy the entire project structure
 3. Point to `backend/docGenerator.http.ts` as the entry point
@@ -244,6 +256,7 @@ To deploy:
 ## Contributing
 
 This is a Val Town project. To contribute:
+
 1. Fork the val
 2. Make your changes
 3. Test thoroughly
@@ -256,6 +269,7 @@ MIT License - see LICENSE file for details
 ## Credits
 
 Built with:
+
 - [TypeScript Compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API)
 - [Hono](https://hono.dev/) - Web framework
 - [React](https://react.dev/) - UI library
