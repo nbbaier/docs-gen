@@ -73,7 +73,7 @@ export function App(props: AppProps): React.ReactElement {
 
       // Update URL without reload
       const newUrl = `/?val=${encodeURIComponent(valIdentifier)}`;
-      window.history.pushState({}, "", newUrl);
+      globalThis.history.pushState({}, "", newUrl);
     } catch (err) {
       console.error(`[fetchDocs] Error caught:`, err);
       setError(err instanceof Error ? err.message : "Unknown error");
